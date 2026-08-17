@@ -1,0 +1,11 @@
+services:
+  order-book:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      MAX_UPLOAD_MB: 15
+      MAX_ROWS: 100000
+      FILE_TTL_MINUTES: 30
+    restart: unless-stopped
+

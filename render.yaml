@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: order-book-system
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_UPLOAD_MB
+        value: "15"
+      - key: MAX_ROWS
+        value: "100000"
+      - key: FILE_TTL_MINUTES
+        value: "30"
+    autoDeployTrigger: commit

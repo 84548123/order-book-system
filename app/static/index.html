@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order Book Data Processing</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/tabs.css">
+</head>
+<body>
+  <main class="shell">
+    <header><span class="eyebrow">OPERATIONS TOOL</span><h1>Order Book Data Processing</h1><p>Upload one Excel workbook to validate, summarize, preview, and download your order book.</p></header>
+    <section class="card upload-card">
+      <div><h2>Upload Excel File</h2><p>Accepts .xlsx files up to 15 MB. Only the eight configured columns from the first tab are processed.</p></div>
+      <label class="file-picker"><input id="file" type="file" accept=".xlsx"><span id="file-label">Choose Excel File</span></label>
+      <button id="process" disabled>Process File</button>
+      <div id="status" role="status" aria-live="polite"></div>
+    </section>
+    <section id="results" class="card hidden">
+      <div class="result-head"><div><span class="success">Processing Completed</span><h2>Summary / Order Book</h2><p id="record-count"></p></div><a id="download" class="button" href="#">Download Excel</a></div>
+      <div id="warnings" class="warnings hidden"></div>
+      <div class="sheet-tabs" role="tablist" aria-label="Workbook sheets">
+        <button class="sheet-tab" data-sheet="processed" role="tab">Processed Data <small>8 columns</small></button>
+        <button class="sheet-tab active" data-sheet="detail" role="tab">Detail summary <small>6 columns</small></button>
+        <button class="sheet-tab" data-sheet="factory" role="tab">Factory Summary <small>4 columns</small></button>
+      </div>
+      <div class="toolbar"><input id="search" type="search" placeholder="Search all records…" aria-label="Search records"><span id="visible-count"></span></div>
+      <div class="table-wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
