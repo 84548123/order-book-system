@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import uuid
 import zipfile
@@ -18,6 +19,8 @@ from app.services.processor import ProcessingError, process_workbook
 BASE_DIR = Path(__file__).resolve().parent
 TEMP_DIR = BASE_DIR.parent / ".processed"
 TEMP_DIR.mkdir(exist_ok=True)
+LATEST_DATA_PATH = TEMP_DIR / "latest.json"
+LATEST_FILE_PATH = TEMP_DIR / "latest.xlsx"
 
 app = FastAPI(title="Order Book Data Processing", version="1.0.0")
 files: dict[str, tuple[Path, float]] = {}
@@ -76,9 +79,10 @@ async def process(file: UploadFile = File(...)):
     path = TEMP_DIR / f"{file_id}.xlsx"
     path.write_bytes(result.content)
     files[file_id] = (path, time.time())
-    return {
+    payload = {
         "status": "completed",
-        "file_id": file_id,
+        "file_id": "latest",
+        "filename": file.filename,
         "total_records": result.total_records,
         "warnings": result.warnings[:100],
         "warning_count": len(result.warnings),
@@ -86,10 +90,32 @@ async def process(file: UploadFile = File(...)):
         "detail_summary": result.detail_summary,
         "factory_summary": result.factory_summary,
     }
+    # Keep the latest successful upload available to every browser using the app.
+    LATEST_FILE_PATH.write_bytes(result.content)
+    temporary_data = LATEST_DATA_PATH.with_suffix(".tmp")
+    temporary_data.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    temporary_data.replace(LATEST_DATA_PATH)
+    return payload
+
+
+@app.get("/api/latest")
+def latest():
+    if not LATEST_DATA_PATH.exists():
+        raise HTTPException(404, "No workbook has been uploaded yet.")
+    try:
+        return json.loads(LATEST_DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(503, "The latest dataset is temporarily unavailable.") from exc
 
 
 @app.get("/api/download/{file_id}")
 def download(file_id: str):
+    if file_id == "latest" and LATEST_FILE_PATH.exists():
+        return FileResponse(
+            LATEST_FILE_PATH,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="processed_order_book.xlsx",
+        )
     _cleanup_expired()
     entry = files.get(file_id)
     if not entry or not entry[0].exists():
