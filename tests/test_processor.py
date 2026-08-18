@@ -32,10 +32,10 @@ def test_missing_required_column():
 
 
 @pytest.mark.parametrize("delivery,expected", [
-    (date(2026, 8, 15), 6),
-    (date(2026, 8, 18), 3),
-    (date(2026, 8, 21), None),
-    (date(2026, 8, 25), None),
+    (date(2026, 8, 15), -6),
+    (date(2026, 8, 18), -3),
+    (date(2026, 8, 21), 0),
+    (date(2026, 8, 25), 4),
     (None, None),
 ])
 def test_days_gap_only_for_overdue_dates(delivery, expected):
@@ -51,8 +51,8 @@ def test_excel_output_has_exact_tabs_and_columns():
     assert [c.value for c in book["Detail summary"][1]] == SUMMARY_COLUMNS
     assert [c.value for c in book["Factory Summary"][1]] == FACTORY_COLUMNS
     assert all(book[name].auto_filter.ref for name in book.sheetnames)
-    assert book["Detail summary"]["F2"].value == '=IF(AND(ISNUMBER(A2),TODAY()>A2),TODAY()-A2,"")'
-    assert book["Processed Data"]["K2"].value == '=IF(AND(ISNUMBER(F2),TODAY()>F2),TODAY()-F2,"")'
+    assert book["Detail summary"]["F2"].value == '=IF(ISNUMBER(A2),A2-TODAY(),"")'
+    assert book["Processed Data"]["K2"].value == '=IF(ISNUMBER(F2),F2-TODAY(),"")'
     assert book["Processed Data"]["L2"].value is None
     assert book["Processed Data"]["M2"].value == "P.C"
 

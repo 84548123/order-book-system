@@ -183,8 +183,7 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
             else:
                 item[name] = _identifier_value(cell.value, cell.number_format)
         delivery = item["ExpDiaDlvDate"]
-        gap = (today - delivery).days if delivery else None
-        item[GAP_COLUMN] = gap if gap is not None and gap > 0 else None
+        item[GAP_COLUMN] = (delivery - today).days if delivery else None
         item["ExpectedDiaWt"] = _bag_qty(ws.cell(row_number, mapping["ExpectedDiaWt"]).value) or 0
         item["Total Value"] = _bag_qty(ws.cell(row_number, mapping["Total Value"]).value) or 0
         if not item["PoNo"]:
@@ -208,7 +207,7 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
     factory_sheet.append(FACTORY_COLUMNS)
     for excel_row, item in enumerate(records, start=2):
         processed.append([None if name == GAP_COLUMN else _safe_excel_value(item[name]) for name in PROCESSED_COLUMNS])
-        processed.cell(excel_row, 11, f'=IF(AND(ISNUMBER(F{excel_row}),TODAY()>F{excel_row}),TODAY()-F{excel_row},"")')
+        processed.cell(excel_row, 11, f'=IF(ISNUMBER(F{excel_row}),F{excel_row}-TODAY(),"")')
     po_groups: dict[str, dict[str, Any]] = {}
     for index, item in enumerate(records):
         key = item["PoNo"] or f"__blank_{index}"
@@ -222,7 +221,8 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
     detail_summary = list(po_groups.values())
     for excel_row, item in enumerate(detail_summary, start=2):
         summary.append([item[name] for name in SUMMARY_COLUMNS[:-1]] + [None])
-        summary.cell(excel_row, 6, f'=IF(AND(ISNUMBER(A{excel_row}),TODAY()>A{excel_row}),TODAY()-A{excel_row},"")')
+        if item[GAP_COLUMN] is not None:
+            summary.cell(excel_row, 6, f'=IF(ISNUMBER(A{excel_row}),A{excel_row}-TODAY(),"")')
     factory_totals: dict[str, dict[str, float]] = {}
     for item in records:
         factory = item["Order Book"] or "(Blank)"
@@ -247,6 +247,9 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
     for row in range(2, processed.max_row + 1):
         processed.cell(row, 9).number_format = "#,##0"
         processed.cell(row, 10).number_format = "#,##0"
+        processed.cell(row, 11).number_format = '+0 "Days";-0 "Days";0 "Days"'
+    for row in range(2, summary.max_row + 1):
+        summary.cell(row, 6).number_format = '+0 "Days";-0 "Days";0 "Days"'
     for row in range(2, factory_sheet.max_row + 1):
         factory_sheet.cell(row, 2).number_format = "#,##0"
         factory_sheet.cell(row, 3).number_format = "#,##0"
