@@ -22,7 +22,7 @@ REQUIRED_COLUMNS = [
     "Expected Dia Qly",
 ]
 SUMMARY_COLUMNS = ["Date", "Order Book", "Client name", "Bag Qty", "PO No.", "Gap Days"]
-PROCESSED_COLUMNS = REQUIRED_COLUMNS + ["ExpectedDiaWt", "Total Value", "Gap Days", "PPC"]
+PROCESSED_COLUMNS = REQUIRED_COLUMNS + ["ExpectedDiaWt", "Total Value", "Gap Days", "Notes", "PPC"]
 FACTORY_COLUMNS = ["Factory Name", "Total No. of Bag Qty", "Total Sum of Expected Dia Wt", "Total Sum Value"]
 EXTRA_SOURCE_COLUMNS = ["ExpectedDiaWt", "Total Value", "ItemPoNo", "Manufacturer"]
 GAP_COLUMN = "Gap Days"
@@ -136,7 +136,7 @@ def _style_sheet(ws, columns: int, rows: int) -> None:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(columns)}{max(rows, 1)}"
     ws.row_dimensions[1].height = 24
-    widths = [18, 24, 24, 13, 20, 16, 24, 24, 18, 18, 14, 14]
+    widths = [18, 24, 24, 13, 20, 16, 24, 24, 18, 18, 14, 24, 14]
     for index in range(1, columns + 1):
         ws.column_dimensions[get_column_letter(index)].width = widths[index - 1]
     if rows > 1:
@@ -191,6 +191,7 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
             fallback = ws.cell(row_number, mapping["ItemPoNo"])
             item["PoNo"] = _identifier_value(fallback.value, fallback.number_format)
         manufacturer = ws.cell(row_number, mapping["Manufacturer"])
+        item["Notes"] = ""
         item["PPC"] = _identifier_value(manufacturer.value, manufacturer.number_format)
         records.append(item)
 
@@ -213,7 +214,7 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
         key = item["PoNo"] or f"__blank_{index}"
         if key not in po_groups:
             po_groups[key] = {
-                "Date": item["ExpDiaDlvDate"], "Order Book": item["Order Book"],
+                "Date": item["ExpDiaDlvDate"] or item["OrderDate"], "Order Book": item["Order Book"],
                 "Client name": item["ClientCode"], "Bag Qty": 0,
                 "PO No.": item["PoNo"], "Gap Days": item[GAP_COLUMN],
             }

@@ -53,7 +53,14 @@ def test_excel_output_has_exact_tabs_and_columns():
     assert all(book[name].auto_filter.ref for name in book.sheetnames)
     assert book["Detail summary"]["F2"].value == '=IF(AND(ISNUMBER(A2),TODAY()>A2),TODAY()-A2,"")'
     assert book["Processed Data"]["K2"].value == '=IF(AND(ISNUMBER(F2),TODAY()>F2),TODAY()-F2,"")'
-    assert book["Processed Data"]["L2"].value == "P.C"
+    assert book["Processed Data"]["L2"].value is None
+    assert book["Processed Data"]["M2"].value == "P.C"
+
+
+def test_detail_date_falls_back_to_order_date_without_false_gap():
+    result = process_workbook(workbook_bytes(rows=[sample_row(delivery=None)]), today=date(2026, 8, 21))
+    assert result.detail_summary[0]["Date"] == "01-Aug-2026"
+    assert result.detail_summary[0]["Gap Days"] is None
 
 
 def test_missing_po_uses_item_po_in_both_tabs():
