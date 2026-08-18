@@ -22,9 +22,9 @@ REQUIRED_COLUMNS = [
     "Expected Dia Qly",
 ]
 SUMMARY_COLUMNS = ["Date", "Order Book", "Client name", "Bag Qty", "PO No.", "Gap Days"]
-PROCESSED_COLUMNS = REQUIRED_COLUMNS + ["Gap Days", "ExpectedDiaWt", "Total Value"]
+PROCESSED_COLUMNS = REQUIRED_COLUMNS + ["ExpectedDiaWt", "Total Value", "Gap Days", "PPC"]
 FACTORY_COLUMNS = ["Factory Name", "Total No. of Bag Qty", "Total Sum of Expected Dia Wt", "Total Sum Value"]
-FACTORY_SOURCE_COLUMNS = ["ExpectedDiaWt", "Total Value"]
+EXTRA_SOURCE_COLUMNS = ["ExpectedDiaWt", "Total Value", "ItemPoNo", "Manufacturer"]
 GAP_COLUMN = "Gap Days"
 
 # Deliberately conservative: aliases can be added here without changing processing code.
@@ -61,7 +61,7 @@ def _column_map(headers: list[Any]) -> dict[str, int]:
             missing.append(required)
         else:
             found[required] = match
-    for required in FACTORY_SOURCE_COLUMNS:
+    for required in EXTRA_SOURCE_COLUMNS:
         match = normalized.get(_normalize_header(required))
         if match is None:
             missing.append(required)
@@ -136,7 +136,7 @@ def _style_sheet(ws, columns: int, rows: int) -> None:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(columns)}{max(rows, 1)}"
     ws.row_dimensions[1].height = 24
-    widths = [18, 24, 24, 13, 20, 16, 24, 24, 14, 20, 18]
+    widths = [18, 24, 24, 13, 20, 16, 24, 24, 18, 18, 14, 14]
     for index in range(1, columns + 1):
         ws.column_dimensions[get_column_letter(index)].width = widths[index - 1]
     if rows > 1:
@@ -187,6 +187,11 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
         item[GAP_COLUMN] = gap if gap is not None and gap > 0 else None
         item["ExpectedDiaWt"] = _bag_qty(ws.cell(row_number, mapping["ExpectedDiaWt"]).value) or 0
         item["Total Value"] = _bag_qty(ws.cell(row_number, mapping["Total Value"]).value) or 0
+        if not item["PoNo"]:
+            fallback = ws.cell(row_number, mapping["ItemPoNo"])
+            item["PoNo"] = _identifier_value(fallback.value, fallback.number_format)
+        manufacturer = ws.cell(row_number, mapping["Manufacturer"])
+        item["PPC"] = _identifier_value(manufacturer.value, manufacturer.number_format)
         records.append(item)
 
     if not records:
@@ -201,8 +206,8 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
     summary.append(SUMMARY_COLUMNS)
     factory_sheet.append(FACTORY_COLUMNS)
     for excel_row, item in enumerate(records, start=2):
-        processed.append([_safe_excel_value(item[name]) for name in REQUIRED_COLUMNS] + [None, item["ExpectedDiaWt"], item["Total Value"]])
-        processed.cell(excel_row, 9, f'=IF(AND(ISNUMBER(F{excel_row}),TODAY()>F{excel_row}),TODAY()-F{excel_row},"")')
+        processed.append([None if name == GAP_COLUMN else _safe_excel_value(item[name]) for name in PROCESSED_COLUMNS])
+        processed.cell(excel_row, 11, f'=IF(AND(ISNUMBER(F{excel_row}),TODAY()>F{excel_row}),TODAY()-F{excel_row},"")')
     po_groups: dict[str, dict[str, Any]] = {}
     for index, item in enumerate(records):
         key = item["PoNo"] or f"__blank_{index}"
@@ -239,8 +244,8 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
             target.cell(row, 4).number_format = "#,##0.###"
         _style_sheet(target, target.max_column, target.max_row)
     for row in range(2, processed.max_row + 1):
+        processed.cell(row, 9).number_format = "#,##0"
         processed.cell(row, 10).number_format = "#,##0"
-        processed.cell(row, 11).number_format = "#,##0"
     for row in range(2, factory_sheet.max_row + 1):
         factory_sheet.cell(row, 2).number_format = "#,##0"
         factory_sheet.cell(row, 3).number_format = "#,##0"

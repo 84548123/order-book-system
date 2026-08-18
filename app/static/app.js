@@ -1,4 +1,4 @@
-const baseColumns=["OrderDate","ClientCode","StyleCode","BagQty","PoNo","ExpDiaDlvDate","Order Book","Expected Dia Qly","Gap Days","ExpectedDiaWt","Total Value"];
+const baseColumns=["OrderDate","ClientCode","StyleCode","BagQty","PoNo","ExpDiaDlvDate","Order Book","Expected Dia Qly","ExpectedDiaWt","Total Value","Gap Days","PPC"];
 const summaryColumns=["Date","Order Book","Client name","Bag Qty","PO No.","Gap Days"];
 const factoryColumns=["Factory Name","Total No. of Bag Qty","Total Sum of Expected Dia Wt","Total Sum Value"];
 let columns=[...summaryColumns],activeSheet="detail",records=[],detailRecords=[],factoryRecords=[],sortColumn=null,sortDirection=1;

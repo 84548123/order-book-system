@@ -7,7 +7,7 @@ from openpyxl import Workbook, load_workbook
 from app.services.processor import FACTORY_COLUMNS, GAP_COLUMN, PROCESSED_COLUMNS, REQUIRED_COLUMNS, SUMMARY_COLUMNS, ProcessingError, process_workbook
 
 
-ALL_SOURCE_COLUMNS = REQUIRED_COLUMNS + ["ExpectedDiaWt", "Total Value"]
+ALL_SOURCE_COLUMNS = REQUIRED_COLUMNS + ["ExpectedDiaWt", "Total Value", "ItemPoNo", "Manufacturer"]
 
 
 def workbook_bytes(headers=ALL_SOURCE_COLUMNS, rows=None):
@@ -21,8 +21,8 @@ def workbook_bytes(headers=ALL_SOURCE_COLUMNS, rows=None):
     return stream.getvalue()
 
 
-def sample_row(delivery=date(2026, 8, 15), factory="OB1", bag_qty=10, weight=2.5, value=100):
-    return [date(2026, 8, 1), "C1", "S1", bag_qty, "001245", delivery, factory, "VS", weight, value]
+def sample_row(delivery=date(2026, 8, 15), factory="OB1", bag_qty=10, weight=2.5, value=100, po="001245", item_po="ALT-PO", manufacturer="P.C"):
+    return [date(2026, 8, 1), "C1", "S1", bag_qty, po, delivery, factory, "VS", weight, value, item_po, manufacturer]
 
 
 def test_missing_required_column():
@@ -50,8 +50,16 @@ def test_excel_output_has_exact_tabs_and_columns():
     assert [c.value for c in book["Processed Data"][1]] == PROCESSED_COLUMNS
     assert [c.value for c in book["Detail summary"][1]] == SUMMARY_COLUMNS
     assert [c.value for c in book["Factory Summary"][1]] == FACTORY_COLUMNS
+    assert all(book[name].auto_filter.ref for name in book.sheetnames)
     assert book["Detail summary"]["F2"].value == '=IF(AND(ISNUMBER(A2),TODAY()>A2),TODAY()-A2,"")'
-    assert book["Processed Data"]["I2"].value == '=IF(AND(ISNUMBER(F2),TODAY()>F2),TODAY()-F2,"")'
+    assert book["Processed Data"]["K2"].value == '=IF(AND(ISNUMBER(F2),TODAY()>F2),TODAY()-F2,"")'
+    assert book["Processed Data"]["L2"].value == "P.C"
+
+
+def test_missing_po_uses_item_po_in_both_tabs():
+    result = process_workbook(workbook_bytes(rows=[sample_row(po="", item_po="FALLBACK-77")]), today=date(2026, 8, 21))
+    assert result.records[0]["PoNo"] == "FALLBACK-77"
+    assert result.detail_summary[0]["PO No."] == "FALLBACK-77"
 
 
 def test_detail_summary_totals_same_po_quantity():
