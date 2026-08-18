@@ -22,6 +22,7 @@ REQUIRED_COLUMNS = [
     "Expected Dia Qly",
 ]
 SUMMARY_COLUMNS = ["Date", "Order Book", "Client name", "Bag Qty", "PO No.", "Gap Days"]
+PROCESSED_COLUMNS = REQUIRED_COLUMNS + ["Gap Days", "ExpectedDiaWt", "Total Value"]
 FACTORY_COLUMNS = ["Factory Name", "Total No. of Bag Qty", "Total Sum of Expected Dia Wt", "Total Sum Value"]
 FACTORY_SOURCE_COLUMNS = ["ExpectedDiaWt", "Total Value"]
 GAP_COLUMN = "Gap Days"
@@ -40,6 +41,7 @@ class ProcessingError(ValueError):
 class ProcessingResult:
     content: bytes
     records: list[dict[str, Any]]
+    detail_summary: list[dict[str, Any]]
     factory_summary: list[dict[str, Any]]
     warnings: list[str]
     total_records: int
@@ -134,7 +136,7 @@ def _style_sheet(ws, columns: int, rows: int) -> None:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(columns)}{max(rows, 1)}"
     ws.row_dimensions[1].height = 24
-    widths = [18, 24, 24, 13, 20, 16, 24, 24]
+    widths = [18, 24, 24, 13, 20, 16, 24, 24, 14, 20, 18]
     for index in range(1, columns + 1):
         ws.column_dimensions[get_column_letter(index)].width = widths[index - 1]
     if rows > 1:
@@ -195,19 +197,25 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
     processed.title = "Processed Data"
     summary = output.create_sheet("Detail summary")
     factory_sheet = output.create_sheet("Factory Summary")
-    processed.append(REQUIRED_COLUMNS)
+    processed.append(PROCESSED_COLUMNS)
     summary.append(SUMMARY_COLUMNS)
     factory_sheet.append(FACTORY_COLUMNS)
     for excel_row, item in enumerate(records, start=2):
-        processed.append([_safe_excel_value(item[name]) for name in REQUIRED_COLUMNS])
-        summary.append([
-            item["ExpDiaDlvDate"],
-            _safe_excel_value(item["Order Book"]),
-            _safe_excel_value(item["ClientCode"]),
-            item["BagQty"],
-            _safe_excel_value(item["PoNo"]),
-            None,
-        ])
+        processed.append([_safe_excel_value(item[name]) for name in REQUIRED_COLUMNS] + [None, item["ExpectedDiaWt"], item["Total Value"]])
+        processed.cell(excel_row, 9, f'=IF(AND(ISNUMBER(F{excel_row}),TODAY()>F{excel_row}),TODAY()-F{excel_row},"")')
+    po_groups: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(records):
+        key = item["PoNo"] or f"__blank_{index}"
+        if key not in po_groups:
+            po_groups[key] = {
+                "Date": item["ExpDiaDlvDate"], "Order Book": item["Order Book"],
+                "Client name": item["ClientCode"], "Bag Qty": 0,
+                "PO No.": item["PoNo"], "Gap Days": item[GAP_COLUMN],
+            }
+        po_groups[key]["Bag Qty"] += item["BagQty"] or 0
+    detail_summary = list(po_groups.values())
+    for excel_row, item in enumerate(detail_summary, start=2):
+        summary.append([item[name] for name in SUMMARY_COLUMNS[:-1]] + [None])
         summary.cell(excel_row, 6, f'=IF(AND(ISNUMBER(A{excel_row}),TODAY()>A{excel_row}),TODAY()-A{excel_row},"")')
     factory_totals: dict[str, dict[str, float]] = {}
     for item in records:
@@ -230,6 +238,9 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
         for row in range(2, target.max_row + 1):
             target.cell(row, 4).number_format = "#,##0.###"
         _style_sheet(target, target.max_column, target.max_row)
+    for row in range(2, processed.max_row + 1):
+        processed.cell(row, 10).number_format = "#,##0"
+        processed.cell(row, 11).number_format = "#,##0"
     for row in range(2, factory_sheet.max_row + 1):
         factory_sheet.cell(row, 2).number_format = "#,##0"
         factory_sheet.cell(row, 3).number_format = "#,##0"
@@ -247,4 +258,5 @@ def process_workbook(content: bytes, today: date | None = None, max_rows: int = 
             "PO No.": item["PoNo"],
         })
         preview.append({key: _display(value) for key, value in view.items()})
-    return ProcessingResult(buffer.getvalue(), preview, factory_summary, warnings, len(records))
+    detail_preview = [{key: _display(value) for key, value in item.items()} for item in detail_summary]
+    return ProcessingResult(buffer.getvalue(), preview, detail_preview, factory_summary, warnings, len(records))

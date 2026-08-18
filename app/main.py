@@ -83,6 +83,7 @@ async def process(file: UploadFile = File(...)):
         "warnings": result.warnings[:100],
         "warning_count": len(result.warnings),
         "records": result.records,
+        "detail_summary": result.detail_summary,
         "factory_summary": result.factory_summary,
     }
 

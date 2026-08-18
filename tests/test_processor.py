@@ -4,7 +4,7 @@ from io import BytesIO
 import pytest
 from openpyxl import Workbook, load_workbook
 
-from app.services.processor import FACTORY_COLUMNS, GAP_COLUMN, REQUIRED_COLUMNS, SUMMARY_COLUMNS, ProcessingError, process_workbook
+from app.services.processor import FACTORY_COLUMNS, GAP_COLUMN, PROCESSED_COLUMNS, REQUIRED_COLUMNS, SUMMARY_COLUMNS, ProcessingError, process_workbook
 
 
 ALL_SOURCE_COLUMNS = REQUIRED_COLUMNS + ["ExpectedDiaWt", "Total Value"]
@@ -47,10 +47,19 @@ def test_excel_output_has_exact_tabs_and_columns():
     result = process_workbook(workbook_bytes(rows=[sample_row()]), today=date(2026, 8, 21))
     book = load_workbook(BytesIO(result.content), data_only=False)
     assert book.sheetnames == ["Processed Data", "Detail summary", "Factory Summary"]
-    assert [c.value for c in book["Processed Data"][1]] == REQUIRED_COLUMNS
+    assert [c.value for c in book["Processed Data"][1]] == PROCESSED_COLUMNS
     assert [c.value for c in book["Detail summary"][1]] == SUMMARY_COLUMNS
     assert [c.value for c in book["Factory Summary"][1]] == FACTORY_COLUMNS
     assert book["Detail summary"]["F2"].value == '=IF(AND(ISNUMBER(A2),TODAY()>A2),TODAY()-A2,"")'
+    assert book["Processed Data"]["I2"].value == '=IF(AND(ISNUMBER(F2),TODAY()>F2),TODAY()-F2,"")'
+
+
+def test_detail_summary_totals_same_po_quantity():
+    rows = [sample_row(bag_qty=10), sample_row(bag_qty=5)]
+    result = process_workbook(workbook_bytes(rows=rows), today=date(2026, 8, 21))
+    assert len(result.detail_summary) == 1
+    assert result.detail_summary[0]["PO No."] == "001245"
+    assert result.detail_summary[0]["Bag Qty"] == 15
 
 
 def test_factory_summary_aggregates_factory_totals():
