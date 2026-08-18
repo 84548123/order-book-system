@@ -9,12 +9,13 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 
 from app.config import settings
 from app.services.processor import ProcessingError, process_workbook
+from app.services.storage import StorageError, enabled as permanent_storage_enabled, load_latest, save_latest
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMP_DIR = BASE_DIR.parent / ".processed"
@@ -95,11 +96,22 @@ async def process(file: UploadFile = File(...)):
     temporary_data = LATEST_DATA_PATH.with_suffix(".tmp")
     temporary_data.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     temporary_data.replace(LATEST_DATA_PATH)
+    try:
+        await asyncio.to_thread(save_latest, payload, result.content)
+    except StorageError as exc:
+        raise HTTPException(503, str(exc)) from exc
     return payload
 
 
 @app.get("/api/latest")
 def latest():
+    if permanent_storage_enabled():
+        try:
+            stored = load_latest()
+        except StorageError as exc:
+            raise HTTPException(503, str(exc)) from exc
+        if stored:
+            return stored[0]
     if not LATEST_DATA_PATH.exists():
         raise HTTPException(404, "No workbook has been uploaded yet.")
     try:
@@ -110,6 +122,17 @@ def latest():
 
 @app.get("/api/download/{file_id}")
 def download(file_id: str):
+    if file_id == "latest" and permanent_storage_enabled():
+        try:
+            stored = load_latest()
+        except StorageError as exc:
+            raise HTTPException(503, str(exc)) from exc
+        if stored:
+            return Response(
+                content=stored[1],
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": 'attachment; filename="processed_order_book.xlsx"'},
+            )
     if file_id == "latest" and LATEST_FILE_PATH.exists():
         return FileResponse(
             LATEST_FILE_PATH,
