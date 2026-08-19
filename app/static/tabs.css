@@ -11,6 +11,13 @@
 .filter-panel input{accent-color:#0f876d}
 .filter-search{position:sticky;top:0;z-index:2;width:100%;min-width:164px;padding:8px;border:1px solid #9fb0bd;border-radius:5px;background:#fff;color:#17324d;font:inherit}
 .filter-option.search-hidden{display:none}
+.numeric-filter{display:grid;gap:6px;padding:5px 0 9px;border-bottom:1px solid #dbe5ea}
+.numeric-filter strong{font-size:12px}
+.numeric-filter select,.numeric-filter input{width:100%;padding:7px;border:1px solid #9fb0bd;border-radius:5px;background:#fff;color:#17324d;font:inherit}
+.numeric-values{display:flex;gap:5px}
+.numeric-actions{display:flex;gap:6px}
+.numeric-actions button{flex:1;padding:7px;border-radius:5px;font-size:11px}
+.numeric-actions .numeric-clear{background:#e7edf1;color:#17324d}
 .table-wrap.processed-view{overflow-x:hidden}
 .processed-view table{width:100%;table-layout:fixed;font-size:10px}
 .processed-view th,.processed-view td{padding:8px 4px;white-space:normal;overflow-wrap:anywhere;line-height:1.25}
